@@ -1,0 +1,2733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SVG Slides Studio - Private & Tracker-Free Presentation Maker</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip CDN for saving and reading slide folders/zips -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;1,400&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+    }
+    .slide-canvas-viewport {
+      background-color: #0b0f19;
+      background-image: radial-gradient(rgba(148, 163, 184, 0.18) 1.5px, transparent 1.5px);
+      background-size: 24px 24px;
+    }
+    .handle {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #ffffff;
+      border: 2px solid #0284c7;
+      border-radius: 3px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      z-index: 30;
+      touch-action: none;
+    }
+    .handle-nw { top: -6px; left: -6px; cursor: nwse-resize; }
+    .handle-ne { top: -6px; right: -6px; cursor: nesw-resize; }
+    .handle-se { bottom: -6px; right: -6px; cursor: nwse-resize; }
+    .handle-sw { bottom: -6px; left: -6px; cursor: nesw-resize; }
+    
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.7); }
+    
+    .color-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1.5px solid rgba(255, 255, 255, 0.15);
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    .color-dot:hover { 
+      transform: scale(1.15); 
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+    
+    #presViewportWrapper {
+      touch-action: none;
+    }
+    .laser-dot {
+      pointer-events: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ef4444;
+      box-shadow: 0 0 14px 5px rgba(239, 68, 68, 0.9);
+      position: absolute;
+      transform: translate(-50%, -50%);
+      z-index: 100;
+      transition: transform 0.03s linear;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-slate-950 text-slate-100 antialiased">
+
+  <!-- TOP TOOLBAR & HEADER -->
+  <header class="h-14 bg-slate-900/90 backdrop-blur border-b border-slate-800/80 px-3.5 flex items-center justify-between z-30 shrink-0 gap-3">
+    <!-- Brand & Deck title -->
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-500 via-indigo-600 to-cyan-400 shadow-md shadow-sky-500/20 text-white shrink-0">
+        <i data-lucide="presentation" class="w-4 h-4"></i>
+      </div>
+      <div class="flex items-center gap-2 min-w-0">
+        <input id="deckTitleInput" type="text" value="Untitled Slide Deck" 
+               class="bg-transparent text-sm font-semibold tracking-tight text-slate-100 hover:bg-slate-800/60 focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500 px-2 py-0.5 rounded transition max-w-[210px] md:max-w-xs truncate">
+        <span class="hidden lg:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <i data-lucide="shield-check" class="w-3 h-3 mr-1 inline"></i> 100% Private
+        </span>
+      </div>
+    </div>
+
+    <!-- Center Quick Tool Palette -->
+    <div class="hidden md:flex items-center gap-1 bg-slate-950/80 border border-slate-800 p-1 rounded-lg">
+      <button id="btnNewDeckMenu" title="New Deck (Blank or Template)" class="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/80 rounded transition">
+        <i data-lucide="file-plus" class="w-3.5 h-3.5 text-emerald-400"></i> New Deck
+      </button>
+      <button id="addSlideBtn" title="New Slide (Ctrl+M)" class="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/80 rounded transition">
+        <i data-lucide="plus" class="w-3.5 h-3.5 text-sky-400"></i> Slide
+      </button>
+      <div class="h-4 w-px bg-slate-800 mx-0.5"></div>
+      <button id="btnInsertTitle" title="Title (Header)" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="heading" class="w-4 h-4"></i></button>
+      <button id="btnInsertBody" title="Text Paragraph" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="type" class="w-4 h-4"></i></button>
+      <button id="btnInsertImage" title="Insert Image from URL" class="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-slate-800 rounded transition"><i data-lucide="image" class="w-4 h-4"></i></button>
+      <button id="btnInsertCard" title="Card Box" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="square" class="w-4 h-4"></i></button>
+      <button id="btnInsertBadge" title="Badge / Pill" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="tags" class="w-4 h-4"></i></button>
+      <button id="btnInsertCircle" title="Circle Shape" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="circle" class="w-4 h-4"></i></button>
+      <button id="btnInsertArrow" title="Arrow Callout" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+      <button id="btnInsertCode" title="Code Block" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="code" class="w-4 h-4"></i></button>
+      <button id="btnInsertBulletList" title="Bulleted List" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition"><i data-lucide="list" class="w-4 h-4"></i></button>
+    </div>
+
+    <!-- Right Actions: Import, Export, Present -->
+    <div class="flex items-center gap-2">
+      <!-- Import Button -->
+      <label for="importFileInput" title="Import SVGs or ZIP deck" class="cursor-pointer flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/80 rounded-lg transition border border-slate-700/70">
+        <i data-lucide="upload" class="w-3.5 h-3.5 text-cyan-400"></i>
+        <span>Import</span>
+      </label>
+      <input type="file" id="importFileInput" accept=".svg,.zip" multiple class="hidden" />
+
+      <!-- Save single slide -->
+      <button id="saveSingleSvgBtn" title="Download current slide as SVG" class="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800/90 hover:bg-slate-700/80 rounded-lg transition border border-slate-700/70">
+        <i data-lucide="file-down" class="w-3.5 h-3.5 text-sky-400"></i>
+        <span>SVG</span>
+      </button>
+
+      <!-- Save as Folder ZIP -->
+      <button id="saveFolderBtn" title="Export entire presentation as a ZIP containing Slide1.svg, Slide2.svg..." class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 rounded-lg shadow-md shadow-sky-600/20 transition active:scale-95">
+        <i data-lucide="folder-down" class="w-3.5 h-3.5 text-sky-200"></i>
+        <span>Save as Folder</span>
+      </button>
+
+      <!-- Present button -->
+      <button id="previewModeBtn" title="Launch Presentation View (F5)" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:text-emerald-200 bg-emerald-950/80 hover:bg-emerald-900/90 rounded-lg transition border border-emerald-600/40">
+        <i data-lucide="play" class="w-3.5 h-3.5 text-emerald-400 fill-emerald-400"></i>
+        <span>Present</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="flex-1 flex overflow-hidden relative">
+
+    <!-- LEFT SIDEBAR: Slide Thumbnails Panel -->
+    <aside class="w-60 bg-slate-900/95 border-r border-slate-800/80 flex flex-col shrink-0 select-none">
+      <div class="p-2.5 border-b border-slate-800 flex items-center justify-between">
+        <span class="text-xs font-semibold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-sky-400"></i> Slides (<span id="slideCountDisplay">2</span>)
+        </span>
+        <div class="flex items-center gap-1">
+          <button id="btnDuplicateSlide" title="Duplicate Slide" class="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+          <button id="btnDeleteSlide" title="Delete Slide" class="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded transition">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Slide list thumbnails -->
+      <div id="slideList" class="flex-1 overflow-y-auto p-2.5 space-y-2.5"></div>
+
+      <!-- Layouts selector -->
+      <div class="p-2.5 border-t border-slate-800 bg-slate-900/90">
+        <label class="text-[11px] font-medium text-slate-400 block mb-1">Layout Preset</label>
+        <select id="templateSelector" class="w-full text-xs bg-slate-950 border border-slate-800 text-slate-300 rounded-md p-1.5 focus:outline-none focus:ring-1 focus:ring-sky-500">
+          <option value="custom">-- Choose Layout --</option>
+          <option value="title">Cover Title Slide</option>
+          <option value="two-column">Two Columns Comparison</option>
+          <option value="key-metric">Big Stat / Metric</option>
+          <option value="blank">Blank Slide</option>
+        </select>
+      </div>
+    </aside>
+
+    <!-- CENTER: Presentation Canvas Stage with Zoom & Pan Viewport -->
+    <div class="flex-1 bg-slate-950 slide-canvas-viewport relative flex flex-col items-center justify-center overflow-hidden cursor-default select-none" id="viewportContainer">
+      
+      <!-- Scaled Transform Wrapper -->
+      <div id="canvasScaleWrapper" style="transform: translate(0px, 0px) scale(1); transform-origin: center center; transition: none;">
+        <!-- Slide Base Container (16:9 Aspect Ratio: 960x540 base) -->
+        <div id="slideContainer" class="relative shadow-2xl" style="width: 960px; height: 540px; background-color: #ffffff; border-radius: 6px; overflow: hidden; box-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.8);">
+          
+          <!-- Live SVG Canvas -->
+          <svg id="slideSvg" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" class="w-full h-full block">
+            <defs id="svgDefs"></defs>
+            <rect id="slideBackground" width="960" height="540" fill="#ffffff" />
+            <g id="elementsGroup"></g>
+          </svg>
+
+          <!-- Interactive Selection Overlay with Resizing Handles -->
+          <div id="selectionOverlay" class="absolute pointer-events-auto hidden" style="border: 2px dashed #0284c7; box-sizing: border-box;">
+            <div class="handle handle-nw" data-handle="nw"></div>
+            <div class="handle handle-ne" data-handle="ne"></div>
+            <div class="handle handle-se" data-handle="se"></div>
+            <div class="handle handle-sw" data-handle="sw"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Floating Editor Zoom and Pan Controls Bar -->
+      <div class="absolute bottom-4 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-full px-3 py-1 flex items-center gap-2 text-xs text-slate-300 shadow-xl z-20">
+        <button id="btnEditorZoomOut" class="p-1 hover:text-white hover:bg-slate-800 rounded-full transition" title="Zoom out editor (Ctrl+Wheel down)"><i data-lucide="minus" class="w-3.5 h-3.5"></i></button>
+        <span id="editorZoomVal" class="px-1.5 font-mono text-[11px] min-w-[42px] text-center">100%</span>
+        <button id="btnEditorZoomIn" class="p-1 hover:text-white hover:bg-slate-800 rounded-full transition" title="Zoom in editor (Ctrl+Wheel up)"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+        <div class="h-3 w-px bg-slate-700 mx-0.5"></div>
+        <button id="btnEditorZoomFit" class="px-2 py-0.5 text-[10px] hover:text-white hover:bg-slate-800 rounded-full transition" title="Fit slide to window">Fit</button>
+        <button id="btnEditorZoom100" class="px-2 py-0.5 text-[10px] hover:text-white hover:bg-slate-800 rounded-full transition" title="Reset zoom to 100%">1:1</button>
+        <div class="h-3 w-px bg-slate-700 mx-0.5"></div>
+        <span class="text-[10px] text-slate-500 hidden sm:inline">Space+Drag to Pan · Arrow keys nudge</span>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR: Formatting, Inspector and Properties -->
+    <aside class="w-64 bg-slate-900/95 border-l border-slate-800/80 p-3.5 flex flex-col shrink-0 overflow-y-auto space-y-4">
+      <div class="border-b border-slate-800 pb-2.5 flex items-center justify-between">
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+          <i data-lucide="sliders" class="w-3.5 h-3.5 text-sky-400"></i> Inspector
+        </h2>
+        <span id="selectionTypeBadge" class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">Slide Base</span>
+      </div>
+
+      <!-- Slide Background Color -->
+      <div class="space-y-2">
+        <label class="text-xs font-semibold text-slate-300 flex items-center justify-between">
+          <span>Slide Background</span>
+          <span id="slideBgHexDisplay" class="font-mono text-[10px] text-slate-400">#ffffff</span>
+        </label>
+        <div class="flex items-center gap-2">
+          <input type="color" id="slideBgColorInput" value="#ffffff" class="w-7 h-7 rounded border-0 cursor-pointer bg-transparent">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <div class="color-dot bg-white" onclick="setSlideBg('#ffffff')"></div>
+            <div class="color-dot bg-slate-900" onclick="setSlideBg('#0f172a')"></div>
+            <div class="color-dot bg-slate-100" onclick="setSlideBg('#f8fafc')"></div>
+            <div class="color-dot bg-sky-950" onclick="setSlideBg('#082f49')"></div>
+            <div class="color-dot bg-indigo-950" onclick="setSlideBg('#1e1b4b')"></div>
+            <div class="color-dot bg-emerald-950" onclick="setSlideBg('#022c22')"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Element Specific Controls -->
+      <div id="elementControls" class="space-y-3.5 border-t border-slate-800 pt-3 hidden">
+        
+        <!-- Image URL Input Section -->
+        <div id="imageUrlSection" class="space-y-1 hidden">
+          <label class="text-xs font-medium text-slate-300 flex items-center justify-between">
+            <span>Image URL</span>
+            <span class="text-[10px] text-slate-500">Direct Link</span>
+          </label>
+          <input type="url" id="propImageUrl" placeholder="https://example.com/photo.png" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono">
+        </div>
+
+        <!-- Text content input -->
+        <div id="textContentSection" class="space-y-1">
+          <label class="text-xs font-medium text-slate-300 flex items-center justify-between">
+            <span>Text Content</span>
+            <span class="text-[10px] text-slate-500">Supports \n</span>
+          </label>
+          <textarea id="propTextContent" rows="3" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 font-sans"></textarea>
+        </div>
+
+        <!-- Typography Settings -->
+        <div id="typographySection" class="space-y-2">
+          <label class="text-xs font-medium text-slate-300">Typography</label>
+          <div class="grid grid-cols-2 gap-1.5">
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Font Family</span>
+              <select id="propFontFamily" class="w-full bg-slate-950 border border-slate-800 rounded p-1 text-xs text-slate-200 focus:ring-1 focus:ring-sky-500">
+                <option value="Inter, sans-serif">Inter</option>
+                <option value="'Space Grotesk', sans-serif">Space Grotesk</option>
+                <option value="'Playfair Display', serif">Playfair Display</option>
+                <option value="'Fira Code', monospace">Fira Code</option>
+                <option value="Impact, sans-serif">Impact</option>
+              </select>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Size (px)</span>
+              <input type="number" id="propFontSize" min="8" max="140" class="w-full bg-slate-950 border border-slate-800 rounded p-1 text-xs text-slate-200 focus:ring-1 focus:ring-sky-500">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-1.5">
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Weight</span>
+              <select id="propFontWeight" class="w-full bg-slate-950 border border-slate-800 rounded p-1 text-xs text-slate-200">
+                <option value="300">Light</option>
+                <option value="400">Regular</option>
+                <option value="600">Semibold</option>
+                <option value="700">Bold</option>
+                <option value="800">Extra Bold</option>
+              </select>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Alignment</span>
+              <select id="propTextAlign" class="w-full bg-slate-950 border border-slate-800 rounded p-1 text-xs text-slate-200">
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Color & Appearance -->
+        <div class="space-y-2">
+          <label class="text-xs font-medium text-slate-300">Appearance</label>
+          <div class="grid grid-cols-2 gap-1.5">
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Color</span>
+              <div class="flex items-center gap-1.5">
+                <input type="color" id="propFillColor" class="w-6 h-6 rounded border-0 cursor-pointer bg-transparent">
+                <input type="text" id="propFillHex" class="w-full bg-slate-950 border border-slate-800 rounded px-1.5 py-0.5 text-xs text-slate-300 font-mono">
+              </div>
+            </div>
+            <div>
+              <span class="text-[10px] text-slate-400 block mb-0.5">Radius</span>
+              <input type="number" id="propCornerRadius" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded p-1 text-xs text-slate-200">
+            </div>
+          </div>
+
+          <div>
+            <span class="text-[10px] text-slate-400 block mb-0.5">Opacity</span>
+            <input type="range" id="propOpacity" min="0.05" max="1" step="0.05" class="w-full accent-sky-500">
+          </div>
+        </div>
+
+        <!-- Layer Ordering -->
+        <div class="pt-2 border-t border-slate-800">
+          <label class="text-xs font-medium text-slate-300 block mb-1.5">Arrange</label>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button id="btnBringForward" class="px-2 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded text-xs text-slate-300 flex items-center justify-center gap-1 transition">
+              <i data-lucide="chevron-up" class="w-3.5 h-3.5"></i> Bring Up
+            </button>
+            <button id="btnSendBackward" class="px-2 py-1 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded text-xs text-slate-300 flex items-center justify-center gap-1 transition">
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5"></i> Send Down
+            </button>
+          </div>
+          <button id="btnDeleteElement" class="w-full mt-2 px-2 py-1 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/60 rounded text-xs text-rose-300 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete (Del)
+          </button>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- PRESENTATION FULLSCREEN OVERLAY -->
+  <div id="presentationOverlay" class="fixed inset-0 z-50 bg-black hidden flex-col items-center justify-center select-none overflow-hidden">
+    <!-- Viewport Container for zoom & pan -->
+    <div id="presViewportWrapper" class="w-full h-full flex items-center justify-center relative overflow-hidden">
+      <div id="presScaleContainer" style="transform-origin: center center; transition: none;">
+        <div class="relative shadow-2xl" style="width: 960px; height: 540px;">
+          <svg id="presentationSvg" viewBox="0 0 960 540" xmlns="http://www.w3.org/2000/svg" class="w-full h-full block"></svg>
+          <canvas id="presDrawCanvas" width="960" height="540" class="absolute inset-0 pointer-events-none z-20"></canvas>
+        </div>
+      </div>
+      <!-- Laser dot indicator -->
+      <div id="presLaserDot" class="laser-dot hidden"></div>
+    </div>
+
+    <!-- Presentation HUD Bar -->
+    <div class="absolute bottom-5 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-full px-4 py-2 flex items-center gap-3 text-xs text-slate-200 shadow-2xl z-30">
+      <button id="presPrevBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition" title="Previous Slide (Left Arrow)"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+      <span id="presSlideCounter" class="font-mono text-xs px-2 font-semibold">1 / 2</span>
+      <button id="presNextBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition" title="Next Slide (Right Arrow)"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+      
+      <div class="h-4 w-px bg-slate-700 mx-1"></div>
+      
+      <!-- Presenter Tools -->
+      <button id="presLaserBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition text-slate-400" title="Laser Pointer (L)"><i data-lucide="crosshair" class="w-4 h-4"></i></button>
+      <button id="presPenBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition text-slate-400" title="Annotate Pen (P)"><i data-lucide="pen-tool" class="w-4 h-4"></i></button>
+      <button id="presClearDrawBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition text-slate-400" title="Clear Ink"><i data-lucide="eraser" class="w-4 h-4"></i></button>
+      
+      <div class="h-4 w-px bg-slate-700 mx-1"></div>
+      
+      <!-- Presentation Zoom Controls -->
+      <button id="presZoomOutBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition" title="Zoom Out (-)"><i data-lucide="minus" class="w-4 h-4"></i></button>
+      <span id="presZoomLevelIndicator" class="font-mono text-[11px] min-w-[36px] text-center">100%</span>
+      <button id="presZoomInBtn" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition" title="Zoom In (+)"><i data-lucide="plus" class="w-4 h-4"></i></button>
+      <button id="presResetZoomBtn" class="px-2 py-0.5 text-[11px] hover:text-white hover:bg-slate-800 rounded-full transition" title="Reset Zoom (0)">Fit</button>
+      
+      <div class="h-4 w-px bg-slate-700 mx-1"></div>
+      
+      <button id="presFullscreenToggle" class="p-1.5 hover:text-white hover:bg-slate-800 rounded-full transition" title="Toggle Fullscreen (F)"><i data-lucide="maximize" class="w-4 h-4"></i></button>
+      <button id="presExitBtn" class="p-1.5 hover:text-rose-400 hover:bg-slate-800 rounded-full transition" title="Exit Presentation (Esc)"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+  </div>
+
+  <!-- MODAL: Start Fresh or Choose Starter Template -->
+  <div id="newDeckModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="layout-template" class="w-5 h-5 text-sky-400"></i> Start Deck
+        </h3>
+        <button id="btnCloseDeckModal" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400">Choose whether to start from a completely clean slate or initialize with a curated deck template:</p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <button id="btnDeckStartFresh" class="p-3 text-left rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500 hover:bg-slate-800/50 transition group flex flex-col gap-1.5">
+          <div class="flex items-center gap-2 text-white font-semibold text-xs group-hover:text-sky-400">
+            <i data-lucide="file" class="w-4 h-4 text-emerald-400"></i> Start Fresh (Blank)
+          </div>
+          <span class="text-[11px] text-slate-400">Empty 1-slide white canvas. Ready for your custom layout.</span>
+        </button>
+
+        <button id="btnDeckPitch" class="p-3 text-left rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500 hover:bg-slate-800/50 transition group flex flex-col gap-1.5">
+          <div class="flex items-center gap-2 text-white font-semibold text-xs group-hover:text-sky-400">
+            <i data-lucide="trending-up" class="w-4 h-4 text-sky-400"></i> Pitch Deck (4 Slides)
+          </div>
+          <span class="text-[11px] text-slate-400">Includes Cover, Problem, Solution with photo card, &amp; Key Metrics.</span>
+        </button>
+
+        <button id="btnDeckTech" class="p-3 text-left rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500 hover:bg-slate-800/50 transition group flex flex-col gap-1.5">
+          <div class="flex items-center gap-2 text-white font-semibold text-xs group-hover:text-sky-400">
+            <i data-lucide="terminal" class="w-4 h-4 text-indigo-400"></i> Dark Keynote (3 Slides)
+          </div>
+          <span class="text-[11px] text-slate-400">Deep slate theme with code snippets, badge pills &amp; highlights.</span>
+        </button>
+
+        <button id="btnDeckShowcase" class="p-3 text-left rounded-xl bg-slate-950 border border-slate-800 hover:border-sky-500 hover:bg-slate-800/50 transition group flex flex-col gap-1.5">
+          <div class="flex items-center gap-2 text-white font-semibold text-xs group-hover:text-sky-400">
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i> Showcase &amp; Media
+          </div>
+          <span class="text-[11px] text-slate-400">Designed for image galleries and visual product cards.</span>
+        </button>
+      </div>
+
+      <div class="pt-2 border-t border-slate-800/80 flex justify-end">
+        <button id="btnCancelDeckModal" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Insert Image Link Prompt -->
+  <div id="imageInsertModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <i data-lucide="image" class="w-5 h-5 text-cyan-400"></i> Insert Image from URL
+        </h3>
+        <button id="btnCloseImageModal" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <label class="text-xs text-slate-300 font-medium block">Image Link (HTTPS URL):</label>
+        <input type="url" id="imageModalUrlInput" placeholder="https://images.unsplash.com/photo-..." class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 font-mono">
+        <p class="text-[11px] text-slate-400">Pro-tip: You can paste any direct web image link or Unsplash / CDN photo URL.</p>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button id="btnCancelImageModal" class="px-3 py-1.5 rounded-lg text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Cancel</button>
+        <button id="btnConfirmInsertImage" class="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-sky-600 hover:bg-sky-500 transition">Insert Image</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Toast message container -->
+  <div id="toastBox" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toastContent" class="bg-slate-900 border border-slate-700 text-white text-xs font-medium px-4 py-3 rounded-lg shadow-2xl flex items-center gap-2.5">
+      <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+      <span id="toastMessage">Done!</span>
+    </div>
+  </div>
+
+  <script>
+    /* Application Core State */
+    const state = {
+      deckTitle: "My Presentation",
+      currentSlideIndex: 0,
+      selectedElementId: null,
+      editorZoom: 1,
+      editorPan: { x: 0, y: 0 },
+      isEditorPanning: false,
+      editorPanStart: { x: 0, y: 0 },
+      isSpacePressed: false,
+      isDragging: false,
+      isResizing: false,
+      resizeHandle: null,
+      dragStart: { x: 0, y: 0 },
+      elementStart: { x: 0, y: 0, width: 0, height: 0 },
+      presentation: {
+        active: false,
+        slideIndex: 0,
+        baseScale: 1,
+        userZoom: 1,
+        pan: { x: 0, y: 0 },
+        isPanning: false,
+        panStart: { x: 0, y: 0 },
+        laserActive: false,
+        penActive: false,
+        isDrawing: false,
+        drawColor: "#f59e0b"
+      },
+      slides: [
+        {
+          id: "slide_1",
+          background: "#0f172a",
+          elements: [
+            {
+              id: "el_1",
+              type: "badge",
+              x: 80,
+              y: 80,
+              width: 170,
+              height: 38,
+              text: "NEW RELEASE · SVG",
+              fontSize: 13,
+              fontWeight: "700",
+              fontFamily: "'Space Grotesk', sans-serif",
+              fill: "#1e293b",
+              textColor: "#38bdf8",
+              borderRadius: 20,
+              opacity: 1
+            },
+            {
+              id: "el_2",
+              type: "text",
+              x: 80,
+              y: 140,
+              width: 800,
+              height: 110,
+              text: "Private, Tracker-Free\nSlide Presentations",
+              fontSize: 48,
+              fontWeight: "800",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#ffffff",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_3",
+              type: "text",
+              x: 80,
+              y: 280,
+              width: 760,
+              height: 70,
+              text: "Create Google Slides style decks that compile directly into standalone, clean SVG files. Click 'Save as Folder' to export Slide1.svg, Slide2.svg, and more packaged safely in a zip.",
+              fontSize: 18,
+              fontWeight: "400",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#94a3b8",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_4",
+              type: "card",
+              x: 80,
+              y: 380,
+              width: 250,
+              height: 55,
+              text: "⚡ 100% Vector Quality",
+              fontSize: 15,
+              fontWeight: "600",
+              fontFamily: "'Space Grotesk', sans-serif",
+              fill: "#0284c7",
+              textColor: "#ffffff",
+              borderRadius: 12,
+              opacity: 1
+            },
+            {
+              id: "el_5",
+              type: "card",
+              x: 350,
+              y: 380,
+              width: 280,
+              height: 55,
+              text: "🔒 Zero Tracking / Cloud-free",
+              fontSize: 15,
+              fontWeight: "600",
+              fontFamily: "'Space Grotesk', sans-serif",
+              fill: "#1e293b",
+              textColor: "#e2e8f0",
+              borderRadius: 12,
+              opacity: 1
+            },
+            {
+              id: "el_6",
+              type: "card",
+              x: 650,
+              y: 380,
+              width: 230,
+              height: 55,
+              text: "🔍 Smooth Zooming",
+              fontSize: 15,
+              fontWeight: "600",
+              fontFamily: "'Space Grotesk', sans-serif",
+              fill: "#047857",
+              textColor: "#ffffff",
+              borderRadius: 12,
+              opacity: 1
+            }
+          ]
+        },
+        {
+          id: "slide_2",
+          background: "#ffffff",
+          elements: [
+            {
+              id: "el_201",
+              type: "text",
+              x: 80,
+              y: 70,
+              width: 800,
+              height: 50,
+              text: "Import & Export Made Simple",
+              fontSize: 38,
+              fontWeight: "800",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#0f172a",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_202",
+              type: "card",
+              x: 80,
+              y: 145,
+              width: 380,
+              height: 310,
+              fill: "#f8fafc",
+              borderRadius: 16,
+              opacity: 1
+            },
+            {
+              id: "el_203",
+              type: "text",
+              x: 110,
+              y: 175,
+              width: 320,
+              height: 35,
+              text: "Import Any SVG or Deck",
+              fontSize: 22,
+              fontWeight: "700",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#1e293b",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_204",
+              type: "text",
+              x: 110,
+              y: 220,
+              width: 320,
+              height: 190,
+              text: "Use the 'Import' button to load individual SlideX.svg files or drop an entire ZIP export right back into the studio. Everything renders editable immediately.",
+              fontSize: 16,
+              fontWeight: "400",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#64748b",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_205",
+              type: "card",
+              x: 500,
+              y: 145,
+              width: 380,
+              height: 310,
+              fill: "#f0fdf4",
+              borderRadius: 16,
+              opacity: 1
+            },
+            {
+              id: "el_206",
+              type: "text",
+              x: 530,
+              y: 175,
+              width: 320,
+              height: 35,
+              text: "Folder Export",
+              fontSize: 22,
+              fontWeight: "700",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#14532d",
+              textAlign: "left",
+              opacity: 1
+            },
+            {
+              id: "el_207",
+              type: "text",
+              x: 530,
+              y: 220,
+              width: 320,
+              height: 190,
+              text: "When you click 'Save as Folder', a ZIP archive is created containing:\n• Slide1.svg\n• Slide2.svg\n• Zero tracking code, completely offline and privacy safe.",
+              fontSize: 16,
+              fontWeight: "400",
+              fontFamily: "'Inter', sans-serif",
+              textColor: "#166534",
+              textAlign: "left",
+              opacity: 1
+            }
+          ]
+        }
+      ]
+    };
+
+    // DOM Elements
+    const slideSvg = document.getElementById("slideSvg");
+    const elementsGroup = document.getElementById("elementsGroup");
+    const slideBackground = document.getElementById("slideBackground");
+    const selectionOverlay = document.getElementById("selectionOverlay");
+    const slideContainer = document.getElementById("slideContainer");
+    const canvasScaleWrapper = document.getElementById("canvasScaleWrapper");
+    const viewportContainer = document.getElementById("viewportContainer");
+    const slideList = document.getElementById("slideList");
+    const slideCountDisplay = document.getElementById("slideCountDisplay");
+    const deckTitleInput = document.getElementById("deckTitleInput");
+    const slideBgColorInput = document.getElementById("slideBgColorInput");
+    const slideBgHexDisplay = document.getElementById("slideBgHexDisplay");
+    const elementControls = document.getElementById("elementControls");
+    const selectionTypeBadge = document.getElementById("selectionTypeBadge");
+
+    // Element property form fields
+    const propTextContent = document.getElementById("propTextContent");
+    const propFontSize = document.getElementById("propFontSize");
+    const propFontFamily = document.getElementById("propFontFamily");
+    const propFontWeight = document.getElementById("propFontWeight");
+    const propTextAlign = document.getElementById("propTextAlign");
+    const propFillColor = document.getElementById("propFillColor");
+    const propFillHex = document.getElementById("propFillHex");
+    const propCornerRadius = document.getElementById("propCornerRadius");
+    const propOpacity = document.getElementById("propOpacity");
+    const propImageUrl = document.getElementById("propImageUrl");
+    const imageUrlSection = document.getElementById("imageUrlSection");
+    const textContentSection = document.getElementById("textContentSection");
+    const typographySection = document.getElementById("typographySection");
+
+    // New Deck & Image Modals
+    const newDeckModal = document.getElementById("newDeckModal");
+    const btnNewDeckMenu = document.getElementById("btnNewDeckMenu");
+    const btnCloseDeckModal = document.getElementById("btnCloseDeckModal");
+    const btnCancelDeckModal = document.getElementById("btnCancelDeckModal");
+    const btnDeckStartFresh = document.getElementById("btnDeckStartFresh");
+    const btnDeckPitch = document.getElementById("btnDeckPitch");
+    const btnDeckTech = document.getElementById("btnDeckTech");
+    const btnDeckShowcase = document.getElementById("btnDeckShowcase");
+
+    const imageInsertModal = document.getElementById("imageInsertModal");
+    const btnInsertImage = document.getElementById("btnInsertImage");
+    const btnCloseImageModal = document.getElementById("btnCloseImageModal");
+    const btnCancelImageModal = document.getElementById("btnCancelImageModal");
+    const btnConfirmInsertImage = document.getElementById("btnConfirmInsertImage");
+    const imageModalUrlInput = document.getElementById("imageModalUrlInput");
+
+    function showToast(message) {
+      const toast = document.getElementById("toastBox");
+      const msg = document.getElementById("toastMessage");
+      msg.textContent = message;
+      toast.classList.remove("translate-y-20", "opacity-0");
+      setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+      }, 2600);
+    }
+
+    function getCurrentSlide() {
+      return state.slides[state.currentSlideIndex];
+    }
+
+    function getSelectedElement() {
+      if (!state.selectedElementId) return null;
+      const slide = getCurrentSlide();
+      return slide.elements.find(el => el.id === state.selectedElementId) || null;
+    }
+
+    function renderCanvas() {
+      const slide = getCurrentSlide();
+      if (!slide) return;
+      slideBackground.setAttribute("fill", slide.background || "#ffffff");
+      slideBgColorInput.value = slide.background || "#ffffff";
+      slideBgHexDisplay.textContent = slide.background || "#ffffff";
+
+      // Clear existing elements in SVG
+      elementsGroup.innerHTML = "";
+
+      slide.elements.forEach(el => {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute("id", el.id);
+        g.style.cursor = "move";
+
+        if (el.type === "card" || el.type === "code") {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", el.x);
+          rect.setAttribute("y", el.y);
+          rect.setAttribute("width", el.width);
+          rect.setAttribute("height", el.height);
+          rect.setAttribute("rx", el.borderRadius || (el.type === "code" ? 8 : 12));
+          rect.setAttribute("ry", el.borderRadius || (el.type === "code" ? 8 : 12));
+          rect.setAttribute("fill", el.fill || (el.type === "code" ? "#0f172a" : "#f1f5f9"));
+          rect.setAttribute("opacity", el.opacity !== undefined ? el.opacity : 1);
+          g.appendChild(rect);
+
+          if (el.text) {
+            const txt = createSvgTextElement(el);
+            g.appendChild(txt);
+          }
+        } else if (el.type === "image") {
+          // If border radius is specified, use SVG clipPath
+          let imageParent = g;
+          if (el.borderRadius && el.borderRadius > 0) {
+            const clipId = `clip_${el.id}`;
+            let clip = slideSvg.querySelector(`#${clipId}`);
+            if (!clip) {
+              clip = document.createElementNS("http://www.w3.org/2000/svg", "clipPath");
+              clip.setAttribute("id", clipId);
+              document.getElementById("svgDefs").appendChild(clip);
+            }
+            clip.innerHTML = `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.borderRadius}" ry="${el.borderRadius}" />`;
+            g.setAttribute("clip-path", `url(#${clipId})`);
+          }
+
+          const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+          img.setAttributeNS("http://www.w3.org/1999/xlink", "href", el.url || "https://placehold.co/400x300/1e293b/94a3b8?text=Image+Not+Found");
+          img.setAttribute("href", el.url || "https://placehold.co/400x300/1e293b/94a3b8?text=Image+Not+Found");
+          img.setAttribute("x", el.x);
+          img.setAttribute("y", el.y);
+          img.setAttribute("width", el.width);
+          img.setAttribute("height", el.height);
+          img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+          img.setAttribute("opacity", el.opacity !== undefined ? el.opacity : 1);
+          g.appendChild(img);
+        } else if (el.type === "circle") {
+          const circle = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+          circle.setAttribute("cx", el.x + el.width / 2);
+          circle.setAttribute("cy", el.y + el.height / 2);
+          circle.setAttribute("rx", el.width / 2);
+          circle.setAttribute("ry", el.height / 2);
+          circle.setAttribute("fill", el.fill || "#3b82f6");
+          circle.setAttribute("opacity", el.opacity !== undefined ? el.opacity : 1);
+          g.appendChild(circle);
+
+          if (el.text) {
+            const txt = createSvgTextElement(el);
+            g.appendChild(txt);
+          }
+        } else if (el.type === "arrow") {
+          const arrowGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", el.x);
+          line.setAttribute("y1", el.y + el.height / 2);
+          line.setAttribute("x2", el.x + el.width - 15);
+          line.setAttribute("y2", el.y + el.height / 2);
+          line.setAttribute("stroke", el.fill || "#38bdf8");
+          line.setAttribute("stroke-width", "6");
+          line.setAttribute("stroke-linecap", "round");
+          
+          const polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+          const endX = el.x + el.width;
+          const midY = el.y + el.height / 2;
+          polygon.setAttribute("points", `${endX},${midY} ${endX - 16},${midY - 10} ${endX - 16},${midY + 10}`);
+          polygon.setAttribute("fill", el.fill || "#38bdf8");
+
+          arrowGroup.appendChild(line);
+          arrowGroup.appendChild(polygon);
+          g.appendChild(arrowGroup);
+        } else if (el.type === "badge") {
+          const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+          rect.setAttribute("x", el.x);
+          rect.setAttribute("y", el.y);
+          rect.setAttribute("width", el.width);
+          rect.setAttribute("height", el.height);
+          rect.setAttribute("rx", el.borderRadius || 20);
+          rect.setAttribute("ry", el.borderRadius || 20);
+          rect.setAttribute("fill", el.fill || "#e0f2fe");
+          rect.setAttribute("opacity", el.opacity !== undefined ? el.opacity : 1);
+          g.appendChild(rect);
+
+          if (el.text) {
+            const txt = createSvgTextElement(el);
+            g.appendChild(txt);
+          }
+        } else {
+          // Standard text
+          const txt = createSvgTextElement(el);
+          g.appendChild(txt);
+        }
+
+        // Pointer event for selecting elements
+        g.addEventListener("mousedown", (evt) => {
+          if (state.isSpacePressed) return;
+          evt.stopPropagation();
+          selectElement(el.id);
+          startDragging(evt);
+        });
+
+        elementsGroup.appendChild(g);
+      });
+
+      updateSelectionOverlay();
+      renderThumbnails();
+    }
+
+    function createSvgTextElement(el) {
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("fill", el.textColor || el.fill || "#0f172a");
+      text.setAttribute("font-size", el.fontSize || 18);
+      text.setAttribute("font-family", el.fontFamily || "'Inter', sans-serif");
+      text.setAttribute("font-weight", el.fontWeight || "400");
+      text.setAttribute("opacity", el.opacity !== undefined ? el.opacity : 1);
+
+      const lines = (el.text || "").split("\n");
+      const lineHeight = (el.fontSize || 18) * 1.35;
+      
+      let startX = el.x;
+      let textAnchor = "start";
+      if (el.textAlign === "center" || el.type === "badge" || (el.type === "card" && el.textAlign === "center") || el.type === "circle") {
+        startX = el.x + el.width / 2;
+        textAnchor = "middle";
+      } else if (el.textAlign === "right") {
+        startX = el.x + el.width;
+        textAnchor = "end";
+      }
+      text.setAttribute("text-anchor", textAnchor);
+
+      let startY = el.y + (el.fontSize || 18);
+      if (el.type === "badge" || (el.type === "card" && lines.length === 1) || el.type === "circle") {
+        startY = el.y + (el.height / 2) + ((el.fontSize || 18) * 0.35);
+      }
+
+      lines.forEach((line, idx) => {
+        const tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute("x", startX);
+        tspan.setAttribute("y", startY + (idx * lineHeight));
+        tspan.textContent = line || " ";
+        text.appendChild(tspan);
+      });
+
+      return text;
+    }
+
+    function selectElement(id) {
+      state.selectedElementId = id;
+      const el = getSelectedElement();
+      if (!el) {
+        selectionOverlay.classList.add("hidden");
+        elementControls.classList.add("hidden");
+        selectionTypeBadge.textContent = "Slide Base";
+        return;
+      }
+
+      selectionOverlay.classList.remove("hidden");
+      elementControls.classList.remove("hidden");
+      selectionTypeBadge.textContent = el.type.toUpperCase();
+
+      if (el.type === "image") {
+        imageUrlSection.classList.remove("hidden");
+        textContentSection.classList.add("hidden");
+        typographySection.classList.add("hidden");
+        propImageUrl.value = el.url || "";
+      } else {
+        imageUrlSection.classList.add("hidden");
+        textContentSection.classList.remove("hidden");
+        typographySection.classList.remove("hidden");
+        propTextContent.value = el.text || "";
+        propFontSize.value = el.fontSize || 20;
+        propFontFamily.value = el.fontFamily || "'Inter', sans-serif";
+        propFontWeight.value = el.fontWeight || "400";
+        propTextAlign.value = el.textAlign || "left";
+      }
+      
+      const activeColor = el.textColor || el.fill || "#0f172a";
+      propFillColor.value = activeColor.startsWith("#") && activeColor.length === 7 ? activeColor : "#0284c7";
+      propFillHex.value = activeColor;
+      
+      propCornerRadius.value = el.borderRadius || 0;
+      propOpacity.value = el.opacity !== undefined ? el.opacity : 1;
+
+      updateSelectionOverlay();
+    }
+
+    function deselectElement() {
+      state.selectedElementId = null;
+      selectionOverlay.classList.add("hidden");
+      elementControls.classList.add("hidden");
+      selectionTypeBadge.textContent = "Slide Base";
+    }
+
+    function updateSelectionOverlay() {
+      const el = getSelectedElement();
+      if (!el) {
+        selectionOverlay.classList.add("hidden");
+        return;
+      }
+      selectionOverlay.classList.remove("hidden");
+      selectionOverlay.style.left = `${el.x}px`;
+      selectionOverlay.style.top = `${el.y}px`;
+      selectionOverlay.style.width = `${el.width}px`;
+      selectionOverlay.style.height = `${el.height}px`;
+    }
+
+    function startDragging(evt) {
+      if (!state.selectedElementId) return;
+      state.isDragging = true;
+      const el = getSelectedElement();
+      state.dragStart = { x: evt.clientX, y: evt.clientY };
+      state.elementStart = { x: el.x, y: el.y, width: el.width, height: el.height };
+    }
+
+    document.querySelectorAll(".handle").forEach(handle => {
+      handle.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        state.isResizing = true;
+        state.resizeHandle = handle.dataset.handle;
+        const el = getSelectedElement();
+        state.dragStart = { x: e.clientX, y: e.clientY };
+        state.elementStart = { x: el.x, y: el.y, width: el.width, height: el.height };
+      });
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      // Editor Panning via Space + Drag or Middle Click
+      if (state.isEditorPanning) {
+        const dx = e.clientX - state.editorPanStart.x;
+        const dy = e.clientY - state.editorPanStart.y;
+        state.editorPan.x += dx;
+        state.editorPan.y += dy;
+        state.editorPanStart = { x: e.clientX, y: e.clientY };
+        updateEditorTransform();
+        return;
+      }
+
+      if (!state.selectedElementId) return;
+      const el = getSelectedElement();
+      if (!el) return;
+
+      // Better coordinate calculation using the scaled bounding box of the slide container
+      const rect = slideContainer.getBoundingClientRect();
+      const scaleFactor = 960 / rect.width;
+
+      const dx = (e.clientX - state.dragStart.x) * scaleFactor;
+      const dy = (e.clientY - state.dragStart.y) * scaleFactor;
+
+      if (state.isDragging) {
+        // Clamp smoothly to presentation bounds
+        const newX = Math.round(state.elementStart.x + dx);
+        const newY = Math.round(state.elementStart.y + dy);
+        el.x = Math.max(-50, Math.min(960 - 20, newX));
+        el.y = Math.max(-50, Math.min(540 - 20, newY));
+        renderCanvas();
+      } else if (state.isResizing) {
+        if (state.resizeHandle === "se") {
+          el.width = Math.max(30, Math.round(state.elementStart.width + dx));
+          el.height = Math.max(20, Math.round(state.elementStart.height + dy));
+        } else if (state.resizeHandle === "sw") {
+          el.width = Math.max(30, Math.round(state.elementStart.width - dx));
+          el.x = Math.round(state.elementStart.x + dx);
+          el.height = Math.max(20, Math.round(state.elementStart.height + dy));
+        } else if (state.resizeHandle === "ne") {
+          el.width = Math.max(30, Math.round(state.elementStart.width + dx));
+          el.height = Math.max(20, Math.round(state.elementStart.height - dy));
+          el.y = Math.round(state.elementStart.y + dy);
+        } else if (state.resizeHandle === "nw") {
+          el.width = Math.max(30, Math.round(state.elementStart.width - dx));
+          el.x = Math.round(state.elementStart.x + dx);
+          el.height = Math.max(20, Math.round(state.elementStart.height - dy));
+          el.y = Math.round(state.elementStart.y + dy);
+        }
+        renderCanvas();
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      state.isDragging = false;
+      state.isResizing = false;
+      if (state.isEditorPanning) {
+        state.isEditorPanning = false;
+        viewportContainer.style.cursor = state.isSpacePressed ? "grab" : "default";
+      }
+    });
+
+    slideSvg.addEventListener("mousedown", (e) => {
+      if (e.target === slideSvg || e.target === slideBackground) {
+        deselectElement();
+      }
+    });
+
+    function updateEditorTransform() {
+      canvasScaleWrapper.style.transform = `translate(${state.editorPan.x}px, ${state.editorPan.y}px) scale(${state.editorZoom})`;
+      document.getElementById("editorZoomVal").textContent = `${Math.round(state.editorZoom * 100)}%`;
+    }
+
+    function setEditorZoom(zoomFactor) {
+      state.editorZoom = Math.min(3.0, Math.max(0.3, zoomFactor));
+      updateEditorTransform();
+    }
+
+    function fitEditorZoom() {
+      const availW = viewportContainer.clientWidth - 80;
+      const availH = viewportContainer.clientHeight - 80;
+      const fitScale = Math.min(availW / 960, availH / 540);
+      state.editorZoom = Math.max(0.3, Math.min(1.4, fitScale));
+      state.editorPan = { x: 0, y: 0 };
+      updateEditorTransform();
+    }
+
+    document.getElementById("btnEditorZoomIn").addEventListener("click", () => setEditorZoom(state.editorZoom + 0.15));
+    document.getElementById("btnEditorZoomOut").addEventListener("click", () => setEditorZoom(state.editorZoom - 0.15));
+    document.getElementById("btnEditorZoomFit").addEventListener("click", fitEditorZoom);
+    document.getElementById("btnEditorZoom100").addEventListener("click", () => {
+      state.editorZoom = 1;
+      state.editorPan = { x: 0, y: 0 };
+      updateEditorTransform();
+    });
+
+    // Spacebar + Pan or Middle click pan in editor
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && e.target.tagName !== "INPUT" && e.target.tagName !== "TEXTAREA") {
+        state.isSpacePressed = true;
+        if (!state.presentation.active) {
+          viewportContainer.style.cursor = "grab";
+        }
+      }
+    });
+
+    window.addEventListener("keyup", (e) => {
+      if (e.code === "Space") {
+        state.isSpacePressed = false;
+        if (!state.presentation.active && !state.isEditorPanning) {
+          viewportContainer.style.cursor = "default";
+        }
+      }
+    });
+
+    viewportContainer.addEventListener("mousedown", (e) => {
+      if (state.presentation.active) return;
+      if (state.isSpacePressed || e.button === 1) {
+        state.isEditorPanning = true;
+        state.editorPanStart = { x: e.clientX, y: e.clientY };
+        viewportContainer.style.cursor = "grabbing";
+        e.preventDefault();
+      }
+    });
+
+    // Wheel zoom & pan in editor
+    viewportContainer.addEventListener("wheel", (e) => {
+      if (state.presentation.active) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        // Ctrl+Wheel = Zoom
+        const zoomDelta = e.deltaY < 0 ? 0.1 : -0.1;
+        setEditorZoom(state.editorZoom + zoomDelta);
+      } else {
+        // Regular Wheel = Pan vertically/horizontally
+        state.editorPan.x -= e.deltaX * 0.8;
+        state.editorPan.y -= e.deltaY * 0.8;
+        updateEditorTransform();
+      }
+    }, { passive: false });
+
+    function renderThumbnails() {
+      slideList.innerHTML = "";
+      state.slides.forEach((slide, idx) => {
+        const isSelected = idx === state.currentSlideIndex;
+        const item = document.createElement("div");
+        item.className = `p-2 rounded-lg cursor-pointer transition border flex flex-col gap-1.5 ${
+          isSelected 
+            ? "bg-slate-900 border-sky-500 shadow-md ring-1 ring-sky-500/50" 
+            : "bg-slate-950/80 border-slate-800 hover:border-slate-700 hover:bg-slate-900/60"
+        }`;
+
+        const header = document.createElement("div");
+        header.className = "flex items-center justify-between text-[11px] font-medium text-slate-400";
+        header.innerHTML = `
+          <span>Slide ${idx + 1}</span>
+          <span class="text-[10px] text-slate-500">${slide.elements.length} items</span>
+        `;
+
+        const preview = document.createElement("div");
+        preview.className = "w-full aspect-video rounded overflow-hidden relative border border-slate-700/40 shadow-inner";
+        preview.style.backgroundColor = slide.background || "#ffffff";
+        
+        const miniSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        miniSvg.setAttribute("viewBox", "0 0 960 540");
+        miniSvg.className = "w-full h-full block";
+
+        slide.elements.forEach(el => {
+          if (el.type === "card" || el.type === "badge" || el.type === "code") {
+            const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            r.setAttribute("x", el.x);
+            r.setAttribute("y", el.y);
+            r.setAttribute("width", el.width);
+            r.setAttribute("height", el.height);
+            r.setAttribute("rx", el.borderRadius || 8);
+            r.setAttribute("fill", el.fill || "#94a3b8");
+            r.setAttribute("opacity", el.opacity || 1);
+            miniSvg.appendChild(r);
+          } else if (el.type === "image") {
+            const img = document.createElementNS("http://www.w3.org/2000/svg", "image");
+            img.setAttribute("href", el.url || "");
+            img.setAttribute("x", el.x);
+            img.setAttribute("y", el.y);
+            img.setAttribute("width", el.width);
+            img.setAttribute("height", el.height);
+            img.setAttribute("preserveAspectRatio", "xMidYMid slice");
+            img.setAttribute("opacity", el.opacity || 1);
+            miniSvg.appendChild(img);
+          } else if (el.type === "circle") {
+            const c = document.createElementNS("http://www.w3.org/2000/svg", "ellipse");
+            c.setAttribute("cx", el.x + el.width/2);
+            c.setAttribute("cy", el.y + el.height/2);
+            c.setAttribute("rx", el.width/2);
+            c.setAttribute("ry", el.height/2);
+            c.setAttribute("fill", el.fill || "#94a3b8");
+            miniSvg.appendChild(c);
+          }
+          if (el.text) {
+            const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            t.setAttribute("x", el.x);
+            t.setAttribute("y", el.y + (el.fontSize || 18));
+            t.setAttribute("fill", el.textColor || el.fill || "#334155");
+            t.setAttribute("font-size", el.fontSize || 18);
+            t.textContent = el.text.split("\n")[0] || "";
+            miniSvg.appendChild(t);
+          }
+        });
+
+        preview.appendChild(miniSvg);
+        item.appendChild(header);
+        item.appendChild(preview);
+
+        item.addEventListener("click", () => {
+          state.currentSlideIndex = idx;
+          deselectElement();
+          renderCanvas();
+        });
+
+        slideList.appendChild(item);
+      });
+
+      slideCountDisplay.textContent = state.slides.length;
+    }
+
+    function addElement(typeConfig) {
+      const slide = getCurrentSlide();
+      const newId = `el_${Date.now()}`;
+      const newElement = {
+        id: newId,
+        x: 120,
+        y: 120,
+        width: 300,
+        height: 80,
+        opacity: 1,
+        ...typeConfig
+      };
+      slide.elements.push(newElement);
+      renderCanvas();
+      selectElement(newId);
+    }
+
+    document.getElementById("btnInsertTitle").addEventListener("click", () => {
+      addElement({
+        type: "text",
+        width: 720,
+        height: 80,
+        text: "Add Slide Title Here",
+        fontSize: 44,
+        fontWeight: "800",
+        fontFamily: "'Inter', sans-serif",
+        textColor: getCurrentSlide().background === "#0f172a" ? "#ffffff" : "#0f172a",
+        textAlign: "left"
+      });
+    });
+
+    document.getElementById("btnInsertBody").addEventListener("click", () => {
+      addElement({
+        type: "text",
+        width: 600,
+        height: 100,
+        text: "This is a body text paragraph. You can format color, font, size, and layout easily.",
+        fontSize: 18,
+        fontWeight: "400",
+        fontFamily: "'Inter', sans-serif",
+        textColor: getCurrentSlide().background === "#0f172a" ? "#94a3b8" : "#475569",
+        textAlign: "left"
+      });
+    });
+
+    document.getElementById("btnInsertCard").addEventListener("click", () => {
+      addElement({
+        type: "card",
+        width: 320,
+        height: 180,
+        fill: getCurrentSlide().background === "#0f172a" ? "#1e293b" : "#f1f5f9",
+        borderRadius: 16,
+        text: "Feature Card",
+        fontSize: 20,
+        fontWeight: "700",
+        fontFamily: "'Inter', sans-serif",
+        textColor: getCurrentSlide().background === "#0f172a" ? "#ffffff" : "#0f172a",
+        textAlign: "left"
+      });
+    });
+
+    document.getElementById("btnInsertBadge").addEventListener("click", () => {
+      addElement({
+        type: "badge",
+        width: 140,
+        height: 34,
+        fill: "#0284c7",
+        borderRadius: 20,
+        text: "HIGHLIGHT",
+        fontSize: 12,
+        fontWeight: "700",
+        fontFamily: "'Space Grotesk', sans-serif",
+        textColor: "#ffffff",
+        textAlign: "center"
+      });
+    });
+
+    document.getElementById("btnInsertCircle").addEventListener("click", () => {
+      addElement({
+        type: "circle",
+        width: 120,
+        height: 120,
+        fill: "#0ea5e9",
+        opacity: 0.9,
+        text: "",
+        fontSize: 16
+      });
+    });
+
+    document.getElementById("btnInsertArrow").addEventListener("click", () => {
+      addElement({
+        type: "arrow",
+        width: 180,
+        height: 40,
+        fill: "#38bdf8",
+        opacity: 1
+      });
+    });
+
+    document.getElementById("btnInsertCode").addEventListener("click", () => {
+      addElement({
+        type: "code",
+        width: 480,
+        height: 140,
+        fill: "#020617",
+        borderRadius: 12,
+        text: "const slide = new Slide({\n  title: 'SVG Studio',\n  tracking: false\n});",
+        fontSize: 15,
+        fontWeight: "400",
+        fontFamily: "'Fira Code', monospace",
+        textColor: "#38bdf8",
+        textAlign: "left"
+      });
+    });
+
+    document.getElementById("btnInsertBulletList").addEventListener("click", () => {
+      addElement({
+        type: "text",
+        width: 500,
+        height: 140,
+        text: "• Key point or argument one\n• Second supporting evidence\n• Final takeaway and conclusion",
+        fontSize: 20,
+        fontWeight: "400",
+        fontFamily: "'Inter', sans-serif",
+        textColor: getCurrentSlide().background === "#0f172a" ? "#cbd5e1" : "#334155",
+        textAlign: "left"
+      });
+    });
+
+    // Add, Duplicate, and Delete Slide
+    document.getElementById("addSlideBtn").addEventListener("click", () => {
+      const newSlide = {
+        id: `slide_${Date.now()}`,
+        background: getCurrentSlide().background || "#ffffff",
+        elements: [
+          {
+            id: `el_${Date.now()}_1`,
+            type: "text",
+            x: 80,
+            y: 80,
+            width: 700,
+            height: 60,
+            text: `Slide ${state.slides.length + 1} Heading`,
+            fontSize: 40,
+            fontWeight: "800",
+            textColor: getCurrentSlide().background === "#0f172a" ? "#ffffff" : "#0f172a"
+          }
+        ]
+      };
+      state.slides.push(newSlide);
+      state.currentSlideIndex = state.slides.length - 1;
+      deselectElement();
+      renderCanvas();
+      showToast(`Slide ${state.slides.length} added`);
+    });
+
+    document.getElementById("btnDuplicateSlide").addEventListener("click", () => {
+      const current = getCurrentSlide();
+      const cloned = JSON.parse(JSON.stringify(current));
+      cloned.id = `slide_${Date.now()}`;
+      cloned.elements.forEach(el => el.id = `el_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
+      state.slides.splice(state.currentSlideIndex + 1, 0, cloned);
+      state.currentSlideIndex += 1;
+      deselectElement();
+      renderCanvas();
+      showToast("Slide duplicated");
+    });
+
+    document.getElementById("btnDeleteSlide").addEventListener("click", () => {
+      if (state.slides.length <= 1) {
+        showToast("Cannot delete the only remaining slide");
+        return;
+      }
+      state.slides.splice(state.currentSlideIndex, 1);
+      if (state.currentSlideIndex >= state.slides.length) {
+        state.currentSlideIndex = state.slides.length - 1;
+      }
+      deselectElement();
+      renderCanvas();
+      showToast("Slide deleted");
+    });
+
+    function setSlideBg(color) {
+      getCurrentSlide().background = color;
+      renderCanvas();
+    }
+    window.setSlideBg = setSlideBg;
+
+    slideBgColorInput.addEventListener("input", (e) => {
+      getCurrentSlide().background = e.target.value;
+      renderCanvas();
+    });
+
+    propTextContent.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.text = e.target.value;
+      renderCanvas();
+    });
+
+    propFontSize.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.fontSize = parseInt(e.target.value, 10) || 16;
+      renderCanvas();
+    });
+
+    propFontFamily.addEventListener("change", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.fontFamily = e.target.value;
+      renderCanvas();
+    });
+
+    propFontWeight.addEventListener("change", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.fontWeight = e.target.value;
+      renderCanvas();
+    });
+
+    propTextAlign.addEventListener("change", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.textAlign = e.target.value;
+      renderCanvas();
+    });
+
+    propFillColor.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      if (el.type === "card" || el.type === "circle" || el.type === "badge" || el.type === "arrow" || el.type === "code") {
+        el.fill = e.target.value;
+      } else {
+        el.textColor = e.target.value;
+      }
+      propFillHex.value = e.target.value;
+      renderCanvas();
+    });
+
+    propFillHex.addEventListener("change", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      if (el.type === "card" || el.type === "circle" || el.type === "badge" || el.type === "arrow" || el.type === "code") {
+        el.fill = e.target.value;
+      } else {
+        el.textColor = e.target.value;
+      }
+      renderCanvas();
+    });
+
+    propCornerRadius.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.borderRadius = parseInt(e.target.value, 10) || 0;
+      renderCanvas();
+    });
+
+    propOpacity.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el) return;
+      el.opacity = parseFloat(e.target.value);
+      renderCanvas();
+    });
+
+    document.getElementById("btnBringForward").addEventListener("click", () => {
+      const slide = getCurrentSlide();
+      const idx = slide.elements.findIndex(el => el.id === state.selectedElementId);
+      if (idx !== -1 && idx < slide.elements.length - 1) {
+        const item = slide.elements.splice(idx, 1)[0];
+        slide.elements.splice(idx + 1, 0, item);
+        renderCanvas();
+      }
+    });
+
+    document.getElementById("btnSendBackward").addEventListener("click", () => {
+      const slide = getCurrentSlide();
+      const idx = slide.elements.findIndex(el => el.id === state.selectedElementId);
+      if (idx > 0) {
+        const item = slide.elements.splice(idx, 1)[0];
+        slide.elements.splice(idx - 1, 0, item);
+        renderCanvas();
+      }
+    });
+
+    document.getElementById("btnDeleteElement").addEventListener("click", () => {
+      const slide = getCurrentSlide();
+      slide.elements = slide.elements.filter(el => el.id !== state.selectedElementId);
+      deselectElement();
+      renderCanvas();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      // Ignore when typing inside input or textarea
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+
+      if ((e.key === "Delete" || e.key === "Backspace") && state.selectedElementId) {
+        const slide = getCurrentSlide();
+        slide.elements = slide.elements.filter(el => el.id !== state.selectedElementId);
+        deselectElement();
+        renderCanvas();
+      }
+
+      // Precision Arrow Nudge
+      if (state.selectedElementId && (e.key.startsWith("Arrow"))) {
+        const el = getSelectedElement();
+        if (el) {
+          e.preventDefault();
+          const step = e.shiftKey ? 10 : 1;
+          if (e.key === "ArrowLeft") el.x -= step;
+          if (e.key === "ArrowRight") el.x += step;
+          if (e.key === "ArrowUp") el.y -= step;
+          if (e.key === "ArrowDown") el.y += step;
+          renderCanvas();
+        }
+      }
+
+      if (e.key === "F5") {
+        e.preventDefault();
+        document.getElementById("previewModeBtn").click();
+      }
+    });
+
+    // Layout presets
+    document.getElementById("templateSelector").addEventListener("change", (e) => {
+      const val = e.target.value;
+      if (val === "custom") return;
+      const slide = getCurrentSlide();
+      slide.elements = [];
+
+      if (val === "title") {
+        slide.background = "#0f172a";
+        slide.elements.push({
+          id: `el_${Date.now()}_1`,
+          type: "badge",
+          x: 100,
+          y: 160,
+          width: 140,
+          height: 32,
+          text: "KEYNOTE 2026",
+          fontSize: 12,
+          fontWeight: "700",
+          fontFamily: "'Space Grotesk', sans-serif",
+          fill: "#1e293b",
+          textColor: "#38bdf8",
+          borderRadius: 20
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_2`,
+          type: "text",
+          x: 100,
+          y: 220,
+          width: 760,
+          height: 90,
+          text: "Future of Decentralized Design",
+          fontSize: 46,
+          fontWeight: "800",
+          fontFamily: "'Inter', sans-serif",
+          textColor: "#ffffff"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_3`,
+          type: "text",
+          x: 100,
+          y: 330,
+          width: 700,
+          height: 40,
+          text: "Clean, portable, and open-format presentations made entirely offline.",
+          fontSize: 18,
+          fontWeight: "400",
+          fontFamily: "'Inter', sans-serif",
+          textColor: "#94a3b8"
+        });
+      } else if (val === "two-column") {
+        slide.background = "#ffffff";
+        slide.elements.push({
+          id: `el_${Date.now()}_1`,
+          type: "text",
+          x: 80,
+          y: 70,
+          width: 800,
+          height: 50,
+          text: "Comparison Layout",
+          fontSize: 36,
+          fontWeight: "800",
+          textColor: "#0f172a"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_2`,
+          type: "card",
+          x: 80,
+          y: 150,
+          width: 380,
+          height: 300,
+          fill: "#f8fafc",
+          borderRadius: 16
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_3`,
+          type: "text",
+          x: 110,
+          y: 180,
+          width: 320,
+          height: 30,
+          text: "Legacy Software",
+          fontSize: 22,
+          fontWeight: "700",
+          textColor: "#0f172a"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_4`,
+          type: "text",
+          x: 110,
+          y: 230,
+          width: 320,
+          height: 150,
+          text: "• Proprietary lock-ins\n• Telemetry & tracking\n• Bulky exports",
+          fontSize: 16,
+          textColor: "#475569"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_5`,
+          type: "card",
+          x: 500,
+          y: 150,
+          width: 380,
+          height: 300,
+          fill: "#eff6ff",
+          borderRadius: 16
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_6`,
+          type: "text",
+          x: 530,
+          y: 180,
+          width: 320,
+          height: 30,
+          text: "SVG Slides Studio",
+          fontSize: 22,
+          fontWeight: "700",
+          textColor: "#0369a1"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_7`,
+          type: "text",
+          x: 530,
+          y: 230,
+          width: 320,
+          height: 150,
+          text: "• 100% Vector resolution\n• Standalone SVG files\n• Zero tracking & private",
+          fontSize: 16,
+          textColor: "#0284c7"
+        });
+      } else if (val === "key-metric") {
+        slide.background = "#090d16";
+        slide.elements.push({
+          id: `el_${Date.now()}_1`,
+          type: "text",
+          x: 100,
+          y: 140,
+          width: 760,
+          height: 120,
+          text: "100%",
+          fontSize: 110,
+          fontWeight: "800",
+          fontFamily: "'Space Grotesk', sans-serif",
+          textColor: "#38bdf8",
+          textAlign: "center"
+        });
+        slide.elements.push({
+          id: `el_${Date.now()}_2`,
+          type: "text",
+          x: 100,
+          y: 290,
+          width: 760,
+          height: 50,
+          text: "Private, Local & Infinite Quality",
+          fontSize: 26,
+          fontWeight: "700",
+          textColor: "#ffffff",
+          textAlign: "center"
+        });
+      }
+
+      e.target.value = "custom";
+      deselectElement();
+      renderCanvas();
+    });
+
+    function generateStandaloneSvg(slide) {
+      let content = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated by SVG Slides Studio (Private, tracker-free) -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&amp;family=Inter:wght@300;400;500;600;700;800&amp;family=Playfair+Display:ital,wght@0,600;1,400&amp;family=Space+Grotesk:wght@500;700&amp;display=swap');
+      text { user-select: none; }
+    </style>
+  </defs>
+  <!-- Background -->
+  <rect width="960" height="540" fill="${slide.background || '#ffffff'}" />
+`;
+
+      slide.elements.forEach(el => {
+        const opacityAttr = el.opacity !== undefined && el.opacity !== 1 ? ` opacity="${el.opacity}"` : "";
+
+        if (el.type === "image") {
+          const safeUrl = (el.url || "").replace(/&/g, "&amp;");
+          if (el.borderRadius && el.borderRadius > 0) {
+            const clipId = `clip_${el.id}`;
+            content += `  <clipPath id="${clipId}"><rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.borderRadius}" ry="${el.borderRadius}" /></clipPath>\n`;
+            content += `  <image href="${safeUrl}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" preserveAspectRatio="xMidYMid slice" clip-path="url(#${clipId})"${opacityAttr} />\n`;
+          } else {
+            content += `  <image href="${safeUrl}" x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" preserveAspectRatio="xMidYMid slice"${opacityAttr} />\n`;
+          }
+        } else if (el.type === "card" || el.type === "badge" || el.type === "code") {
+          content += `  <rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" rx="${el.borderRadius || (el.type === 'badge' ? 20 : 12)}" ry="${el.borderRadius || (el.type === 'badge' ? 20 : 12)}" fill="${el.fill || '#f1f5f9'}"${opacityAttr} />\n`;
+        } else if (el.type === "circle") {
+          content += `  <ellipse cx="${el.x + el.width/2}" cy="${el.y + el.height/2}" rx="${el.width/2}" ry="${el.height/2}" fill="${el.fill || '#3b82f6'}"${opacityAttr} />\n`;
+        } else if (el.type === "arrow") {
+          const endX = el.x + el.width;
+          const midY = el.y + el.height / 2;
+          content += `  <line x1="${el.x}" y1="${midY}" x2="${endX - 15}" y2="${midY}" stroke="${el.fill || '#38bdf8'}" stroke-width="6" stroke-linecap="round"${opacityAttr} />\n`;
+          content += `  <polygon points="${endX},${midY} ${endX - 16},${midY - 10} ${endX - 16},${midY + 10}" fill="${el.fill || '#38bdf8'}"${opacityAttr} />\n`;
+        }
+
+        if (el.text) {
+          const lines = el.text.split("\n");
+          const lineHeight = (el.fontSize || 18) * 1.35;
+          let textAnchor = "start";
+          let startX = el.x;
+
+          if (el.textAlign === "center" || el.type === "badge" || (el.type === "card" && el.textAlign === "center") || el.type === "circle") {
+            startX = el.x + el.width / 2;
+            textAnchor = "middle";
+          } else if (el.textAlign === "right") {
+            startX = el.x + el.width;
+            textAnchor = "end";
+          }
+
+          let startY = el.y + (el.fontSize || 18);
+          if (el.type === "badge" || (el.type === "card" && lines.length === 1) || el.type === "circle") {
+            startY = el.y + (el.height / 2) + ((el.fontSize || 18) * 0.35);
+          }
+
+          content += `  <text fill="${el.textColor || el.fill || '#0f172a'}" font-size="${el.fontSize || 18}" font-family="${(el.fontFamily || 'Inter, sans-serif').replace(/"/g, '&quot;')}" font-weight="${el.fontWeight || '400'}" text-anchor="${textAnchor}"${opacityAttr}>\n`;
+          lines.forEach((l, idx) => {
+            const escaped = l
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;");
+            content += `    <tspan x="${startX}" y="${startY + (idx * lineHeight)}">${escaped || " "}</tspan>\n`;
+          });
+          content += `  </text>\n`;
+        }
+      });
+
+      content += `</svg>`;
+      return content;
+    }
+
+    // Save Entire Presentation As Folder (ZIP)
+    document.getElementById("saveFolderBtn").addEventListener("click", async () => {
+      const zip = new JSZip();
+      const folderName = (deckTitleInput.value.trim() || "Slide_Deck").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const deckFolder = zip.folder(folderName);
+
+      state.slides.forEach((slide, index) => {
+        const svgString = generateStandaloneSvg(slide);
+        const fileName = `Slide${index + 1}.svg`;
+        deckFolder.file(fileName, svgString);
+      });
+
+      deckFolder.file("README.txt", `Presentation: ${deckTitleInput.value}\nTotal Slides: ${state.slides.length}\nCreated with SVG Slides Studio.\nZero tracking, 100% private vector presentation.\nEach slide is an open, portable SVG.`);
+
+      showToast("Packaging ZIP with Slide1.svg, Slide2.svg...");
+
+      const content = await zip.generateAsync({ type: "blob" });
+      const downloadLink = document.createElement("a");
+      downloadLink.href = URL.createObjectURL(content);
+      downloadLink.download = `${folderName}.zip`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(downloadLink.href);
+    });
+
+    // Save current slide as single SVG file
+    document.getElementById("saveSingleSvgBtn").addEventListener("click", () => {
+      const slide = getCurrentSlide();
+      const svgString = generateStandaloneSvg(slide);
+      const blob = new Blob([svgString], { type: "image/svg+xml;charset=utf-8" });
+      const downloadLink = document.createElement("a");
+      downloadLink.href = URL.createObjectURL(blob);
+      downloadLink.download = `Slide${state.currentSlideIndex + 1}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(downloadLink.href);
+      showToast(`Downloaded Slide${state.currentSlideIndex + 1}.svg`);
+    });
+
+    // Parser to turn raw SVG back into editable studio slide model
+    function parseSvgToSlide(svgString, fallbackName) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgString, "image/svg+xml");
+      const svgEl = doc.querySelector("svg");
+      if (!svgEl) return null;
+
+      const slide = {
+        id: `slide_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        background: "#ffffff",
+        elements: []
+      };
+
+      // Detect background rect
+      const firstRect = svgEl.querySelector("rect");
+      if (firstRect) {
+        const w = firstRect.getAttribute("width");
+        if (w === "960" || w === "100%" || !firstRect.getAttribute("x") || firstRect.getAttribute("x") === "0") {
+          slide.background = firstRect.getAttribute("fill") || "#ffffff";
+        }
+      }
+
+      // Parse rect shapes (cards, badges)
+      const rects = svgEl.querySelectorAll("rect");
+      rects.forEach((r, idx) => {
+        const x = parseFloat(r.getAttribute("x") || 0);
+        const y = parseFloat(r.getAttribute("y") || 0);
+        const width = parseFloat(r.getAttribute("width") || 100);
+        const height = parseFloat(r.getAttribute("height") || 50);
+        const rx = parseFloat(r.getAttribute("rx") || 0);
+        const fill = r.getAttribute("fill") || "#f1f5f9";
+        const opacity = parseFloat(r.getAttribute("opacity") || 1);
+
+        // Skip the background rect
+        if (x === 0 && y === 0 && (width === 960 || width >= 900)) return;
+
+        slide.elements.push({
+          id: `el_imp_${idx}_${Date.now()}`,
+          type: rx > 16 ? "badge" : "card",
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height),
+          borderRadius: rx,
+          fill: fill,
+          opacity: opacity
+        });
+      });
+
+      // Parse SVG image nodes back into editable studio models
+      const images = svgEl.querySelectorAll("image");
+      images.forEach((img, idx) => {
+        const href = img.getAttribute("href") || img.getAttributeNS("http://www.w3.org/1999/xlink", "href") || "";
+        const x = parseFloat(img.getAttribute("x") || 100);
+        const y = parseFloat(img.getAttribute("y") || 100);
+        const width = parseFloat(img.getAttribute("width") || 300);
+        const height = parseFloat(img.getAttribute("height") || 200);
+        const opacity = parseFloat(img.getAttribute("opacity") || 1);
+
+        slide.elements.push({
+          id: `el_imp_img_${idx}_${Date.now()}`,
+          type: "image",
+          url: href,
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height),
+          borderRadius: 8,
+          opacity: opacity
+        });
+      });
+
+      // Parse text nodes
+      const texts = svgEl.querySelectorAll("text");
+      texts.forEach((t, idx) => {
+        let fullText = "";
+        let firstX = 80;
+        let firstY = 80;
+
+        const tspans = t.querySelectorAll("tspan");
+        if (tspans.length > 0) {
+          const lines = [];
+          tspans.forEach((ts, tsIdx) => {
+            if (tsIdx === 0) {
+              firstX = parseFloat(ts.getAttribute("x") || t.getAttribute("x") || 80);
+              firstY = parseFloat(ts.getAttribute("y") || t.getAttribute("y") || 80);
+            }
+            lines.push(ts.textContent || "");
+          });
+          fullText = lines.join("\n");
+        } else {
+          fullText = t.textContent;
+          firstX = parseFloat(t.getAttribute("x") || 80);
+          firstY = parseFloat(t.getAttribute("y") || 80);
+        }
+
+        const fontSize = parseFloat(t.getAttribute("font-size") || 20);
+        const textColor = t.getAttribute("fill") || "#0f172a";
+        const fontFamily = t.getAttribute("font-family") || "'Inter', sans-serif";
+        const fontWeight = t.getAttribute("font-weight") || "400";
+        const textAnchor = t.getAttribute("text-anchor") || "left";
+
+        slide.elements.push({
+          id: `el_imp_t_${idx}_${Date.now()}`,
+          type: "text",
+          x: Math.round(firstX),
+          y: Math.max(20, Math.round(firstY - fontSize)),
+          width: Math.min(800, Math.max(200, fullText.length * (fontSize * 0.55))),
+          height: Math.max(40, (fullText.split("\n").length * fontSize * 1.4)),
+          text: fullText,
+          fontSize: fontSize,
+          textColor: textColor,
+          fontFamily: fontFamily,
+          fontWeight: fontWeight,
+          textAlign: textAnchor === "middle" ? "center" : (textAnchor === "end" ? "right" : "left"),
+          opacity: 1
+        });
+      });
+
+      return slide;
+    }
+
+    // Property image URL update handler
+    propImageUrl.addEventListener("input", (e) => {
+      const el = getSelectedElement();
+      if (!el || el.type !== "image") return;
+      el.url = e.target.value.trim();
+      renderCanvas();
+    });
+
+    // Image insertion modal handlers
+    btnInsertImage.addEventListener("click", () => {
+      imageModalUrlInput.value = "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80";
+      imageInsertModal.classList.remove("hidden");
+      imageInsertModal.classList.add("flex");
+      setTimeout(() => imageModalUrlInput.select(), 50);
+    });
+
+    const closeImageModal = () => {
+      imageInsertModal.classList.add("hidden");
+      imageInsertModal.classList.remove("flex");
+    };
+
+    btnCloseImageModal.addEventListener("click", closeImageModal);
+    btnCancelImageModal.addEventListener("click", closeImageModal);
+
+    btnConfirmInsertImage.addEventListener("click", () => {
+      const url = imageModalUrlInput.value.trim() || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&auto=format&fit=crop&q=80";
+      addElement({
+        type: "image",
+        url: url,
+        width: 400,
+        height: 250,
+        borderRadius: 12,
+        opacity: 1
+      });
+      closeImageModal();
+      showToast("Image inserted!");
+    });
+
+    // New Deck / Start Fresh or Starter Templates modal handlers
+    btnNewDeckMenu.addEventListener("click", () => {
+      newDeckModal.classList.remove("hidden");
+      newDeckModal.classList.add("flex");
+    });
+
+    const closeDeckModal = () => {
+      newDeckModal.classList.add("hidden");
+      newDeckModal.classList.remove("flex");
+    };
+
+    btnCloseDeckModal.addEventListener("click", closeDeckModal);
+    btnCancelDeckModal.addEventListener("click", closeDeckModal);
+
+    function applyTemplateDeck(deckConfig, name) {
+      state.deckTitle = name;
+      deckTitleInput.value = name;
+      state.slides = deckConfig;
+      state.currentSlideIndex = 0;
+      deselectElement();
+      renderCanvas();
+      fitEditorZoom();
+      closeDeckModal();
+      showToast(`Started: ${name}`);
+    }
+
+    // 1. Fresh Blank Deck
+    btnDeckStartFresh.addEventListener("click", () => {
+      applyTemplateDeck([
+        {
+          id: `slide_${Date.now()}`,
+          background: "#ffffff",
+          elements: [
+            {
+              id: `el_${Date.now()}_1`,
+              type: "text",
+              x: 80,
+              y: 80,
+              width: 700,
+              height: 60,
+              text: "Untitled Slide",
+              fontSize: 44,
+              fontWeight: "800",
+              textColor: "#0f172a"
+            }
+          ]
+        }
+      ], "Blank Presentation");
+    });
+
+    // 2. Pitch Deck
+    btnDeckPitch.addEventListener("click", () => {
+      applyTemplateDeck([
+        {
+          id: `slide_p1_${Date.now()}`,
+          background: "#0b0f19",
+          elements: [
+            {
+              id: `el_p1_1`,
+              type: "badge",
+              x: 80,
+              y: 100,
+              width: 150,
+              height: 34,
+              text: "SERIES A PITCH",
+              fontSize: 12,
+              fontWeight: "700",
+              fill: "#1e293b",
+              textColor: "#38bdf8",
+              borderRadius: 20
+            },
+            {
+              id: `el_p1_2`,
+              type: "text",
+              x: 80,
+              y: 160,
+              width: 760,
+              height: 100,
+              text: "Next Generation\nCloud-Free Presentations",
+              fontSize: 48,
+              fontWeight: "800",
+              textColor: "#ffffff"
+            },
+            {
+              id: `el_p1_3`,
+              type: "text",
+              x: 80,
+              y: 290,
+              width: 700,
+              height: 50,
+              text: "Enterprise decks compiled purely to standalone vector SVG files with zero data tracking.",
+              fontSize: 18,
+              fontWeight: "400",
+              textColor: "#94a3b8"
+            }
+          ]
+        },
+        {
+          id: `slide_p2_${Date.now()}`,
+          background: "#ffffff",
+          elements: [
+            {
+              id: `el_p2_1`,
+              type: "text",
+              x: 80,
+              y: 60,
+              width: 600,
+              height: 45,
+              text: "The Solution & Experience",
+              fontSize: 34,
+              fontWeight: "800",
+              textColor: "#0f172a"
+            },
+            {
+              id: `el_p2_2`,
+              type: "image",
+              url: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80",
+              x: 80,
+              y: 130,
+              width: 380,
+              height: 330,
+              borderRadius: 16
+            },
+            {
+              id: `el_p2_3`,
+              type: "card",
+              x: 490,
+              y: 130,
+              width: 390,
+              height: 330,
+              fill: "#f8fafc",
+              borderRadius: 16
+            },
+            {
+              id: `el_p2_4`,
+              type: "text",
+              x: 520,
+              y: 160,
+              width: 330,
+              height: 40,
+              text: "Lightweight & Universal",
+              fontSize: 22,
+              fontWeight: "700",
+              textColor: "#0f172a"
+            },
+            {
+              id: `el_p2_5`,
+              type: "text",
+              x: 520,
+              y: 215,
+              width: 330,
+              height: 200,
+              text: "• Plays smoothly in every modern browser.\n• Instant ZIP download with clean Slide1.svg naming.\n• Vector scalability to billboard sizes without pixelation.",
+              fontSize: 16,
+              fontWeight: "400",
+              textColor: "#475569"
+            }
+          ]
+        },
+        {
+          id: `slide_p3_${Date.now()}`,
+          background: "#090d16",
+          elements: [
+            {
+              id: `el_p3_1`,
+              type: "text",
+              x: 80,
+              y: 80,
+              width: 800,
+              height: 50,
+              text: "Key Market Metrics",
+              fontSize: 36,
+              fontWeight: "800",
+              textColor: "#ffffff",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_2`,
+              type: "card",
+              x: 80,
+              y: 180,
+              width: 240,
+              height: 200,
+              fill: "#111827",
+              borderRadius: 16
+            },
+            {
+              id: `el_p3_3`,
+              type: "text",
+              x: 80,
+              y: 220,
+              width: 240,
+              height: 60,
+              text: "10x",
+              fontSize: 54,
+              fontWeight: "800",
+              textColor: "#38bdf8",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_4`,
+              type: "text",
+              x: 90,
+              y: 300,
+              width: 220,
+              height: 40,
+              text: "Faster Render Speeds",
+              fontSize: 15,
+              textColor: "#94a3b8",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_5`,
+              type: "card",
+              x: 360,
+              y: 180,
+              width: 240,
+              height: 200,
+              fill: "#111827",
+              borderRadius: 16
+            },
+            {
+              id: `el_p3_6`,
+              type: "text",
+              x: 360,
+              y: 220,
+              width: 240,
+              height: 60,
+              text: "0%",
+              fontSize: 54,
+              fontWeight: "800",
+              textColor: "#34d399",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_7`,
+              type: "text",
+              x: 370,
+              y: 300,
+              width: 220,
+              height: 40,
+              text: "Telemetry or Tracking",
+              fontSize: 15,
+              textColor: "#94a3b8",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_8`,
+              type: "card",
+              x: 640,
+              y: 180,
+              width: 240,
+              height: 200,
+              fill: "#111827",
+              borderRadius: 16
+            },
+            {
+              id: `el_p3_9`,
+              type: "text",
+              x: 640,
+              y: 220,
+              width: 240,
+              height: 60,
+              text: "100%",
+              fontSize: 54,
+              fontWeight: "800",
+              textColor: "#fbbf24",
+              textAlign: "center"
+            },
+            {
+              id: `el_p3_10`,
+              type: "text",
+              x: 650,
+              y: 300,
+              width: 220,
+              height: 40,
+              text: "Offline Autonomy",
+              fontSize: 15,
+              textColor: "#94a3b8",
+              textAlign: "center"
+            }
+          ]
+        }
+      ], "Pitch Deck");
+    });
+
+    // 3. Dark Tech Keynote
+    btnDeckTech.addEventListener("click", () => {
+      applyTemplateDeck([
+        {
+          id: `slide_t1_${Date.now()}`,
+          background: "#030712",
+          elements: [
+            {
+              id: `el_t1_1`,
+              type: "badge",
+              x: 80,
+              y: 100,
+              width: 170,
+              height: 34,
+              text: "SYSTEM ARCHITECTURE",
+              fontSize: 11,
+              fontWeight: "700",
+              fill: "#111827",
+              textColor: "#a855f7",
+              borderRadius: 20
+            },
+            {
+              id: `el_t1_2`,
+              type: "text",
+              x: 80,
+              y: 160,
+              width: 760,
+              height: 90,
+              text: "Vector Presentation Engine",
+              fontSize: 44,
+              fontWeight: "800",
+              textColor: "#ffffff"
+            },
+            {
+              id: `el_t1_3`,
+              type: "code",
+              x: 80,
+              y: 260,
+              width: 800,
+              height: 180,
+              fill: "#0f172a",
+              borderRadius: 14,
+              text: "// Standalone client-side SVG compiler\nimport { createSlide } from '@svg/studio';\n\nconst deck = new Presentation({ format: 'SVG', offline: true });\nawait deck.exportZip('SlideDeck_2026.zip');",
+              fontSize: 16,
+              fontWeight: "400",
+              textColor: "#38bdf8"
+            }
+          ]
+        }
+      ], "Tech Keynote");
+    });
+
+    // 4. Media Showcase
+    btnDeckShowcase.addEventListener("click", () => {
+      applyTemplateDeck([
+        {
+          id: `slide_s1_${Date.now()}`,
+          background: "#0f172a",
+          elements: [
+            {
+              id: `el_s1_1`,
+              type: "text",
+              x: 80,
+              y: 60,
+              width: 800,
+              height: 40,
+              text: "Visual Portfolio Showcase",
+              fontSize: 34,
+              fontWeight: "800",
+              textColor: "#ffffff"
+            },
+            {
+              id: `el_s1_2`,
+              type: "image",
+              url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80",
+              x: 80,
+              y: 130,
+              width: 380,
+              height: 240,
+              borderRadius: 16
+            },
+            {
+              id: `el_s1_3`,
+              type: "image",
+              url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&auto=format&fit=crop&q=80",
+              x: 500,
+              y: 130,
+              width: 380,
+              height: 240,
+              borderRadius: 16
+            },
+            {
+              id: `el_s1_4`,
+              type: "card",
+              x: 80,
+              y: 395,
+              width: 800,
+              height: 70,
+              fill: "#1e293b",
+              borderRadius: 12,
+              text: "Images automatically embed directly into standalone SVG slides with custom corner radius and aspect scaling.",
+              fontSize: 16,
+              fontWeight: "400",
+              textColor: "#cbd5e1",
+              textAlign: "left"
+            }
+          ]
+        }
+      ], "Media Showcase");
+    });
+
+    // Handle File Import (SVG files or ZIP archives)
+    document.getElementById("importFileInput").addEventListener("change", async (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+
+      let importedSlides = [];
+
+      for (const file of files) {
+        if (file.name.endsWith(".zip")) {
+          showToast(`Unpacking ${file.name}...`);
+          try {
+            const zip = await JSZip.loadAsync(file);
+            const svgFileEntries = [];
+            zip.forEach((path, zipEntry) => {
+              if (path.toLowerCase().endsWith(".svg") && !zipEntry.dir) {
+                svgFileEntries.push(zipEntry);
+              }
+            });
+
+            // Sort Slide1, Slide2 naturally
+            svgFileEntries.sort((a, b) => {
+              const numA = parseInt((a.name.match(/\d+/) || [0])[0], 10);
+              const numB = parseInt((b.name.match(/\d+/) || [0])[0], 10);
+              return numA - numB;
+            });
+
+            for (const entry of svgFileEntries) {
+              const textContent = await entry.async("text");
+              const slide = parseSvgToSlide(textContent, entry.name);
+              if (slide) importedSlides.push(slide);
+            }
+          } catch (err) {
+            console.error("Failed to read ZIP:", err);
+            showToast("Error parsing ZIP file.");
+          }
+        } else if (file.name.endsWith(".svg")) {
+          try {
+            const textContent = await file.text();
+            const slide = parseSvgToSlide(textContent, file.name);
+            if (slide) importedSlides.push(slide);
+          } catch (err) {
+            console.error("Failed to read SVG:", err);
+          }
+        }
+      }
+
+      if (importedSlides.length > 0) {
+        state.slides.push(...importedSlides);
+        state.currentSlideIndex = state.slides.length - importedSlides.length;
+        deselectElement();
+        renderCanvas();
+        fitEditorZoom();
+        showToast(`Successfully imported ${importedSlides.length} slide(s)!`);
+      } else {
+        showToast("No valid SVG slides found to import.");
+      }
+
+      // Reset input value to allow re-uploading same file
+      e.target.value = "";
+    });
+
+    function adaptPresentationToScreen() {
+      if (!state.presentation.active) return;
+      const presViewportWrapper = document.getElementById("presViewportWrapper");
+      const presScaleContainer = document.getElementById("presScaleContainer");
+      if (!presViewportWrapper || !presScaleContainer) return;
+
+      const vw = presViewportWrapper.clientWidth;
+      const vh = presViewportWrapper.clientHeight;
+      
+      const scaleX = vw / 960;
+      const scaleY = vh / 540;
+      state.presentation.baseScale = Math.min(scaleX, scaleY) * 0.96;
+      updatePresTransform();
+    }
+
+    function updatePresTransform() {
+      const presScaleContainer = document.getElementById("presScaleContainer");
+      const presZoomLevelIndicator = document.getElementById("presZoomLevelIndicator");
+      if (!presScaleContainer || !presZoomLevelIndicator) return;
+
+      const totalScale = state.presentation.baseScale * state.presentation.userZoom;
+      presScaleContainer.style.transform = `translate(${state.presentation.pan.x}px, ${state.presentation.pan.y}px) scale(${totalScale})`;
+      presZoomLevelIndicator.textContent = `${Math.round(state.presentation.userZoom * 100)}%`;
+    }
+
+    function setPresZoom(level) {
+      state.presentation.userZoom = Math.min(4.0, Math.max(0.6, level));
+      updatePresTransform();
+    }
+
+    function resetPresZoom() {
+      state.presentation.userZoom = 1;
+      state.presentation.pan = { x: 0, y: 0 };
+      adaptPresentationToScreen();
+    }
+
+    function updatePresentationView() {
+      const presentationSvg = document.getElementById("presentationSvg");
+      const presSlideCounter = document.getElementById("presSlideCounter");
+      const presDrawCanvas = document.getElementById("presDrawCanvas");
+      if (!presentationSvg || !presSlideCounter || !presDrawCanvas) return;
+
+      const slide = state.slides[state.presentation.slideIndex];
+      const svgCode = generateStandaloneSvg(slide);
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgCode, "image/svg+xml");
+      const rootSvg = doc.querySelector("svg");
+      presentationSvg.innerHTML = rootSvg ? rootSvg.innerHTML : "";
+      presentationSvg.style.backgroundColor = slide.background || "#ffffff";
+      presSlideCounter.textContent = `${state.presentation.slideIndex + 1} / ${state.slides.length}`;
+      
+      // Clear drawings on slide change
+      const presDrawCtx = presDrawCanvas.getContext("2d");
+      if (presDrawCtx) {
+        presDrawCtx.clearRect(0, 0, presDrawCanvas.width, presDrawCanvas.height);
+      }
+    }
+
+    // Launch Presentation Mode
+    const presentationOverlay = document.getElementById("presentationOverlay");
+    const presLaserDot = document.getElementById("presLaserDot");
+    const presDrawCanvas = document.getElementById("presDrawCanvas");
+    const presDrawCtx = presDrawCanvas.getContext("2d");
+    const presViewportWrapper = document.getElementById("presViewportWrapper");
+
+    document.getElementById("previewModeBtn").addEventListener("click", () => {
+      state.presentation.active = true;
+      state.presentation.slideIndex = state.currentSlideIndex;
+      state.presentation.userZoom = 1;
+      state.presentation.pan = { x: 0, y: 0 };
+      presentationOverlay.classList.remove("hidden");
+      presentationOverlay.classList.add("flex");
+      
+      updatePresentationView();
+      setTimeout(adaptPresentationToScreen, 20);
+    });
+
+    document.getElementById("presPrevBtn").addEventListener("click", () => {
+      if (state.presentation.slideIndex > 0) {
+        state.presentation.slideIndex--;
+        updatePresentationView();
+      }
+    });
+
+    document.getElementById("presNextBtn").addEventListener("click", () => {
+      if (state.presentation.slideIndex < state.slides.length - 1) {
+        state.presentation.slideIndex++;
+        updatePresentationView();
+      }
+    });
+
+    document.getElementById("presExitBtn").addEventListener("click", exitPresentation);
+
+    function exitPresentation() {
+      state.presentation.active = false;
+      state.presentation.laserActive = false;
+      state.presentation.penActive = false;
+      presLaserDot.classList.add("hidden");
+      presDrawCanvas.classList.add("pointer-events-none");
+      presentationOverlay.classList.add("hidden");
+      presentationOverlay.classList.remove("flex");
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    document.getElementById("presZoomInBtn").addEventListener("click", () => setPresZoom(state.presentation.userZoom + 0.25));
+    document.getElementById("presZoomOutBtn").addEventListener("click", () => setPresZoom(state.presentation.userZoom - 0.25));
+    document.getElementById("presResetZoomBtn").addEventListener("click", resetPresZoom);
+
+    document.getElementById("presFullscreenToggle").addEventListener("click", () => {
+      if (!document.fullscreenElement) {
+        presentationOverlay.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    // Laser pointer toggle
+    const presLaserBtn = document.getElementById("presLaserBtn");
+    presLaserBtn.addEventListener("click", () => {
+      state.presentation.laserActive = !state.presentation.laserActive;
+      state.presentation.penActive = false;
+      presDrawCanvas.classList.add("pointer-events-none");
+      presLaserBtn.classList.toggle("text-red-400", state.presentation.laserActive);
+      presLaserBtn.classList.toggle("bg-slate-800", state.presentation.laserActive);
+      presLaserDot.classList.toggle("hidden", !state.presentation.laserActive);
+    });
+
+    // Slide pen toggle
+    const presPenBtn = document.getElementById("presPenBtn");
+    presPenBtn.addEventListener("click", () => {
+      state.presentation.penActive = !state.presentation.penActive;
+      state.presentation.laserActive = false;
+      presLaserDot.classList.add("hidden");
+      presLaserBtn.classList.remove("text-red-400", "bg-slate-800");
+      
+      presPenBtn.classList.toggle("text-amber-400", state.presentation.penActive);
+      presPenBtn.classList.toggle("bg-slate-800", state.presentation.penActive);
+      presDrawCanvas.classList.toggle("pointer-events-none", !state.presentation.penActive);
+    });
+
+    document.getElementById("presClearDrawBtn").addEventListener("click", () => {
+      presDrawCtx.clearRect(0, 0, presDrawCanvas.width, presDrawCanvas.height);
+    });
+
+    // Presentation cursor interactions
+    presViewportWrapper.addEventListener("mousemove", (e) => {
+      if (!state.presentation.active) return;
+
+      if (state.presentation.laserActive) {
+        presLaserDot.style.left = `${e.clientX}px`;
+        presLaserDot.style.top = `${e.clientY}px`;
+      }
+
+      if (state.presentation.isPanning) {
+        const dx = e.clientX - state.presentation.panStart.x;
+        const dy = e.clientY - state.presentation.panStart.y;
+        state.presentation.pan.x += dx;
+        state.presentation.pan.y += dy;
+        state.presentation.panStart = { x: e.clientX, y: e.clientY };
+        updatePresTransform();
+      }
+    });
+
+    presViewportWrapper.addEventListener("wheel", (e) => {
+      if (!state.presentation.active) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.15 : -0.15;
+      setPresZoom(state.presentation.userZoom + delta);
+    }, { passive: false });
+
+    presViewportWrapper.addEventListener("mousedown", (e) => {
+      if (!state.presentation.active || state.presentation.penActive) return;
+      if (e.button === 0 && state.presentation.userZoom > 1.05) {
+        state.presentation.isPanning = true;
+        state.presentation.panStart = { x: e.clientX, y: e.clientY };
+        presViewportWrapper.style.cursor = "grabbing";
+      }
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (state.presentation.isPanning) {
+        state.presentation.isPanning = false;
+        presViewportWrapper.style.cursor = "default";
+      }
+      if (state.presentation.isDrawing) {
+        state.presentation.isDrawing = false;
+      }
+    });
+
+    // Annotations Drawing
+    presDrawCanvas.addEventListener("mousedown", (e) => {
+      if (!state.presentation.penActive) return;
+      state.presentation.isDrawing = true;
+      const rect = presDrawCanvas.getBoundingClientRect();
+      const scaleX = 960 / rect.width;
+      const scaleY = 540 / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      
+      presDrawCtx.beginPath();
+      presDrawCtx.moveTo(x, y);
+      presDrawCtx.strokeStyle = "#f59e0b";
+      presDrawCtx.lineWidth = 4;
+      presDrawCtx.lineCap = "round";
+      presDrawCtx.lineJoin = "round";
+    });
+
+    presDrawCanvas.addEventListener("mousemove", (e) => {
+      if (!state.presentation.penActive || !state.presentation.isDrawing) return;
+      const rect = presDrawCanvas.getBoundingClientRect();
+      const scaleX = 960 / rect.width;
+      const scaleY = 540 / rect.height;
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      
+      presDrawCtx.lineTo(x, y);
+      presDrawCtx.stroke();
+    });
+
+    // Keyboard navigation in presentation
+    window.addEventListener("keydown", (e) => {
+      if (!state.presentation.active) return;
+
+      if (e.key === "Escape") {
+        exitPresentation();
+      } else if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+        if (state.presentation.slideIndex < state.slides.length - 1) {
+          state.presentation.slideIndex++;
+          updatePresentationView();
+        }
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        if (state.presentation.slideIndex > 0) {
+          state.presentation.slideIndex--;
+          updatePresentationView();
+        }
+      } else if (e.key === "+" || e.key === "=") {
+        setPresZoom(state.presentation.userZoom + 0.25);
+      } else if (e.key === "-" || e.key === "_") {
+        setPresZoom(state.presentation.userZoom - 0.25);
+      } else if (e.key === "0") {
+        resetPresZoom();
+      } else if (e.key.toLowerCase() === "l") {
+        presLaserBtn.click();
+      } else if (e.key.toLowerCase() === "p") {
+        presPenBtn.click();
+      } else if (e.key.toLowerCase() === "f") {
+        document.getElementById("presFullscreenToggle").click();
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (state.presentation.active) {
+        adaptPresentationToScreen();
+      }
+    });
+
+    window.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      fitEditorZoom();
+      renderCanvas();
+    });
+  </script>
+</body>
+</html>
